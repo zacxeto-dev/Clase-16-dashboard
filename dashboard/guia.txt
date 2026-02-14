@@ -1,0 +1,177 @@
+consulta para el pareto de los productos
+WITH VentasPorProducto AS (
+    SELECT 
+        productos.nombre, 
+        COALESCE(SUM(tventas.total), 0) AS total_ventas,
+        SUM(COALESCE(SUM(tventas.total), 0)) OVER () AS total_general
+    FROM productos
+    LEFT JOIN tventas ON productos.codpro = tventas.codpro
+    AND MONTH(tventas.Fecha) = MONTH(CURRENT_DATE)
+    AND YEAR(tventas.Fecha) = YEAR(CURRENT_DATE)
+    GROUP BY productos.nombre
+),
+Acumulados AS (
+    SELECT 
+        nombre,
+        total_ventas,
+        total_general,
+        SUM(total_ventas) OVER (ORDER BY total_ventas DESC) AS acumulado,
+        (SUM(total_ventas) OVER (ORDER BY total_ventas DESC) / NULLIF(total_general, 0)) * 100 AS porcentaje_acumulado
+    FROM VentasPorProducto
+),
+Clasificacion8020 AS (
+    SELECT 
+        nombre,
+        total_ventas,
+        acumulado,
+        porcentaje_acumulado,
+        CASE 
+            WHEN ROW_NUMBER() OVER (ORDER BY total_ventas DESC) <= 0.2 * COUNT(*) OVER () THEN 'Top 80%'
+            ELSE 'Otros'
+        END AS grupo
+    FROM Acumulados
+)
+SELECT 
+    grupo,
+    COUNT(nombre) AS cantidad_productos,
+    SUM(total_ventas) AS total_ventas_grupo
+FROM Clasificacion8020
+GROUP BY grupo
+ORDER BY 
+    CASE 
+        WHEN grupo = 'Otros' THEN 1 
+        ELSE 0 
+    END;
+
+
+
+
+
+
+
+
+
+
+
+
+ <div className="content-wrapper"> {/* Contenedor para Aside y Content */}
+<Header />
+<div className="content" style={{ marginLeft: '250px' }}> {/* Ajustar margen para el contenido */}
+  <Routes>
+    <Route path="/" element={<Content />}>
+      <Route path="productos" element={<Productos />} />
+      <Route path="clientes" element={<Clientes />} />
+    </Route>
+  </Routes>
+</div>
+<Footer />  
+</div> 
+
+
+
+/*
+.wrapper {
+  display: flex; 
+  flex-direction: column; 
+  height: 100vh; 
+
+.content-wrapper {
+  display: flex; 
+  flex: 1; /* Permitir que este contenedor ocupe el espacio restante */
+}
+
+.aside {
+  width: 250px; /* Ancho del aside */
+  background-color: #f8f9fa; /* Color de fondo del aside */
+}
+
+.content {
+  flex: 1; /* El contenido ocupará el espacio restante */
+  padding: 20px; /* Espaciado interno */
+  background-color: #ffffff; /* Color de fondo del contenido */
+}
+
+.footer {
+  background-color: #343a40; /* Color de fondo del footer */
+  color: white; /* Color del texto del footer */
+  text-align: center; /* Centrar el texto */
+  padding: 10px; /* Espaciado interno */
+}
+
+
+¡Entiendo perfectamente tu inquietud! La implementación actual del filtro, aunque efectiva para buscar palabras exactas en cualquier orden, puede no ser la más adecuada si deseas que la búsqueda sea más flexible, especialmente cuando se trata de palabras intercaladas.
+
+¿Por qué ocurre esto?
+
+Filtrado en tiempo real: Al dividir la cadena de búsqueda en palabras y aplicar el filtro a cada letra, se está realizando una búsqueda parcial que puede no encontrar coincidencias cuando las palabras están separadas por otros términos.
+Falta de contexto: La expresión regular actual busca las palabras clave en un orden específico, aunque flexible en cuanto a la posición dentro de una palabra.
+Solución: Búsqueda Difusa y Flexibilidad
+
+Para abordar este problema, te sugiero utilizar una biblioteca de búsqueda difusa como Fuse.js. Esta biblioteca es especialmente útil para realizar búsquedas aproximadas y flexibles, permitiendo encontrar coincidencias incluso cuando hay errores de ortografía o cuando las palabras están intercaladas.
+
+JavaScript
+
+import Fuse from 'fuse.js';
+
+const options = {
+  shouldSort: true,
+  threshold: 0.3,
+  location: 0,
+  distance: 100,
+  maxPatternLength: 32,
+  minMatchCharLength: 1,
+  keys: ['nombre', 'descripcion', 'otrosCampos'] // Adapta los campos a tu estructura de datos
+};
+
+const fuse = new Fuse(datos, options);
+
+const result = fuse.search(globalFilter);
+const filteredData = result.map(item => item.item);
+Explicación:
+
+Fuse.js: Esta biblioteca crea un índice de tus datos y permite realizar búsquedas rápidas y flexibles.
+Opciones de configuración:
+shouldSort: Ordena los resultados por relevancia.
+threshold: Determina qué tan cerca debe estar una coincidencia para ser considerada válida.
+location: Especifica la importancia de la posición de la coincidencia.
+distance: Máxima distancia entre las letras de una coincidencia.
+keys: Los campos de tus datos que se buscarán.
+fuse.search: Realiza la búsqueda y devuelve un array de objetos que contienen los resultados y su puntuación de relevancia.
+Ventajas de usar Fuse.js:
+
+Búsqueda difusa: Encuentra coincidencias incluso si hay errores de ortografía o si las palabras están mal escritas.
+Flexibilidad: Permite buscar en múltiples campos y ajustar la configuración de la búsqueda según tus necesidades.
+Rendimiento: Es eficiente para grandes conjuntos de datos.
+Facilidad de uso: La API es sencilla y fácil de entender.
+Adaptación a tu código:
+
+Instalar Fuse.js: npm install fuse.js
+Importar y configurar: Como se muestra en el ejemplo anterior.
+Reemplazar el filtro: En lugar de usar datos.filter, utiliza fuse.search para realizar la búsqueda.
+Consideraciones adicionales:
+
+Personalización: Ajusta las opciones de configuración de Fuse.js para obtener los resultados más precisos para tu caso específico.
+Rendimiento: Si tienes un conjunto de datos muy grande, puedes explorar opciones para mejorar el rendimiento, como indexación previa o la utilización de workers.
+Ejemplo completo:
+
+JavaScript
+
+import React, { useState } from 'react';
+import Fuse from 'fuse.js';
+
+function MyComponent() {
+  const [datos, setDatos] = useState([...]); // Tus datos
+  const [globalFilter, setGlobalFilter] = useState('');
+
+  const options = { ... }; // Opciones de configuración de Fuse.js
+
+  const fuse = new Fuse(datos, options);
+
+  const filteredData = fuse.search(globalFilter).map(item => item.item);
+
+  // ... Resto de tu componente
+}
+Con esta implementación, podrás realizar búsquedas más flexibles y precisas, incluso cuando las palabras estén intercaladas o haya errores de ortografía.
+
+¿Te gustaría explorar otras opciones o profundizar en alguna de estas características?
+
